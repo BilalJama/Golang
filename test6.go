@@ -51,6 +51,6 @@ func main() {
 			},
 		})
 	}
-	sheetjson, _ := json.MarshalIndent(sheet, "", "  ")
+	sheetjson, _ := json.MarshalIndent(sheet, "", " ")
 	fmt.Println(string(sheetjson))
 }
