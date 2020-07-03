@@ -33,11 +33,12 @@ func main() {
 		} else if error != nil {
 			log.Fatal(error)
 		}
-		response, err := http.Get("http://ip-api.com/json/www.google.com?fields=country")
+
+		response, err := http.Get(fmt.Sprintf("http://ip-api.com/json/%s?fields=org", line[0]))
 		/*I  want to able to pass line[0] which is the website in my test csv in the url*
 		Something like http.Get("http://ip-api.com/json/{line[0}?fields=country") only returns empty JSON {}*/
 		if err != nil {
-			fmt.Println("HTTP request failed with error")
+			fmt.Println(err)
 		} else {
 			data, _ := ioutil.ReadAll(response.Body)
 			fmt.Println(string(data))
