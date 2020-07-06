@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/csv"
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -11,45 +10,44 @@ import (
 	"os"
 )
 
-type Sheet struct {
-	Sitename string   `json:"sitename"`
-	Location string   `json:"location"`
-	Address  *Address `json:address`
+func closeFile(f *os.File) {
+	err := f.Close()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
 }
-
-type Address struct {
-	Number string `json:"number"`
-}
-
 func main() {
 
-	csvFile, _ := os.Open("test.csv")
+	m := make(map[string]int)
+
+	csvFile, err := os.Open("test.csv")
+	defer closeFile(csvFile)
+	if err != nil {
+		log.Fatal(err)
+	}
 	reader := csv.NewReader(csvFile)
-	var sheet []Sheet
 	for {
-		line, error := reader.Read()
-		if error == io.EOF {
+		line, err := reader.Read()
+		if err == io.EOF {
 			break
-		} else if error != nil {
-			log.Fatal(error)
+		} else if err != nil {
+			log.Fatal(err)
 		}
 
-		response, err := http.Get(fmt.Sprintf("http://ip-api.com/json/%s?fields=org", line[0]))
+		response, err := http.Get(fmt.Sprintf("http://ip-api.com/json/%s?fields=country", line[0]))
+		defer response.Body.Close()
 		if err != nil {
 			fmt.Println(err)
 		} else {
 			data, _ := ioutil.ReadAll(response.Body)
+
+			for _, key := range string(data) {
+				m[string(key)] = m[string(key)] + 1
+			}
 			fmt.Println(string(data))
 		}
-
-		sheet = append(sheet, Sheet{
-			Sitename: line[0],
-			Location: line[1],
-			Address: &Address{
-				Number: line[2],
-			},
-		})
+		fmt.Println(m)
 	}
-	sheetjson, _ := json.MarshalIndent(sheet, "", " ")
-	fmt.Println(string(sheetjson))
+
 }
