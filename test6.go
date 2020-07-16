@@ -1,61 +1,94 @@
 package main
 
 import (
-    "fmt"
-    "io/ioutil"
+	"encoding/csv"
+	"encoding/json"
+	"flag"
+	"fmt"
+	"io"
+	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
-	"log"
-	"io"
-	"encoding/json"
-	"encoding/csv"
+	"os/exec"
+	"strconv"
 )
 
-type Sheet struct{
-	Sitename string `json:"sitename"`
-	Location string `json:"location"`
-	Address *Address `json:address`
-
+func closeFile(f *os.File) {
+	err := f.Close()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
 }
-
-type Address struct {
-	Number string `json:"number"`
-}
-
-
-
 func main() {
 
-	csvFile, _ := os.Open("test.csv")
-	reader:= csv.NewReader(csvFile)
-	var sheet [] Sheet
-	for {
-	 line, error:= reader.Read()
-		if error==io.EOF {
-			break
-		} else if error!= nil{
-			log.Fatal(error)
-		}
-		response, err:= http.Get("http://ip-api.com/json/www.google.com?fields=country")
-		/*I  want to able to pass line[0] which is the website in my test csv in the url*
-		Something like http.Get("http://ip-api.com/json/{line[0}?fields=country") only returns empty JSON {}*/
-		if err!= nil{
-		fmt.Println("HTTP request failed with error")
-		} else{	
-			data, _:= ioutil.ReadAll(response.Body)
-			fmt.Println(string(data))
-		}
-	
-  
-		sheet = append(sheet, Sheet{
-			Sitename: line[0],
-			Location: line[1],
-			Address: &Address{
-				Number:line[2],
-			},
+	f := flag.String("f", "", "Path to input file")
+	out := flag.String("out", "", "Path to output file")
+	n := flag.Int("n", 0, "Number of websites to analyze")
+	flag.Parse()
+	filee := *f
+	num := *n
+	outt := *out
 
-		})
+	m := make(map[string]string)
+	r := make(map[string]string)
+
+	counter := 1
+
+	csvFile, err :=
+		os.Open(filee)
+	if err != nil {
+		log.Fatal(err)
 	}
-	sheetjson, _:= json.MarshalIndent(sheet, "", "  ")
-	fmt.Println(string(sheetjson))
+	defer closeFile(csvFile)
+	reader := csv.NewReader(csvFile)
+	for i := 1; i <= num; i++ {
+		line, err := reader.Read()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			log.Fatal(err)
+		}
+
+		response, err := http.Get(fmt.Sprintf("http://ip-api.com/json/%s?fields=country", line[0]))
+
+		if err != nil {
+			fmt.Println(err)
+			defer response.Body.Close()
+
+		} else {
+
+			data, _ := ioutil.ReadAll(response.Body)
+			err := json.Unmarshal(data, &m)
+
+			for k := range m {
+				con := fmt.Sprint("", counter)
+				i := m[k] // m[k] is the value "Singapore" and k is "country" only need first value
+
+				if _, ok := r[i]; !ok { //if key doesnt exist initialize counter to 1
+					r[i] = con // r[i] is the value "number" and i the key is "Singapore"
+
+				} else {
+					newVal, _ := strconv.Atoi(r[i]) // if key exists increase by 1
+					newVal++
+					r[i] = fmt.Sprint("", newVal)
+				}
+			}
+
+			if err != nil {
+				panic(err)
+			}
+
+		}
+
+	}
+	file, fileErr := os.Create(outt)
+	if fileErr != nil {
+		fmt.Println(fileErr)
+		return
+	}
+	test, _ := json.MarshalIndent(r, "", "")
+	fmt.Fprint(file, string(test))
+
 }
