@@ -2,12 +2,16 @@ package main
 
 import (
 	"encoding/csv"
+	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
+	"strconv"
 )
 
 func closeFile(f *os.File) {
@@ -19,15 +23,27 @@ func closeFile(f *os.File) {
 }
 func main() {
 
-	m := make(map[string]int)
+	f := flag.String("f", "", "Path to input file")
+	out := flag.String("out", "", "Path to output file")
+	n := flag.Int("n", 0, "Number of websites to analyze")
+	flag.Parse()
+	filee := *f
+	num := *n
+	outt := *out
 
-	csvFile, err := os.Open("test.csv")
-	defer closeFile(csvFile)
+	m := make(map[string]string)
+	r := make(map[string]string)
+
+	counter := 1
+
+	csvFile, err :=
+		os.Open(filee)
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer closeFile(csvFile)
 	reader := csv.NewReader(csvFile)
-	for {
+	for i := 1; i <= num; i++ {
 		line, err := reader.Read()
 		if err == io.EOF {
 			break
@@ -36,18 +52,43 @@ func main() {
 		}
 
 		response, err := http.Get(fmt.Sprintf("http://ip-api.com/json/%s?fields=country", line[0]))
-		defer response.Body.Close()
+
 		if err != nil {
 			fmt.Println(err)
-		} else {
-			data, _ := ioutil.ReadAll(response.Body)
+			defer response.Body.Close()
 
-			for _, key := range string(data) {
-				m[string(key)] = m[string(key)] + 1
+		} else {
+
+			data, _ := ioutil.ReadAll(response.Body)
+			err := json.Unmarshal(data, &m)
+
+			for k := range m {
+				con := fmt.Sprint("", counter)
+				i := m[k] // m[k] is the value "Singapore" and k is "country" only need first value
+
+				if _, ok := r[i]; !ok { //if key doesnt exist initialize counter to 1
+					r[i] = con // r[i] is the value "number" and i the key is "Singapore"
+
+				} else {
+					newVal, _ := strconv.Atoi(r[i]) // if key exists increase by 1
+					newVal++
+					r[i] = fmt.Sprint("", newVal)
+				}
 			}
-			fmt.Println(string(data))
+
+			if err != nil {
+				panic(err)
+			}
+
 		}
-		fmt.Println(m)
+
 	}
+	file, fileErr := os.Create(outt)
+	if fileErr != nil {
+		fmt.Println(fileErr)
+		return
+	}
+	test, _ := json.MarshalIndent(r, "", "")
+	fmt.Fprint(file, string(test))
 
 }
